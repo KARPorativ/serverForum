@@ -38,18 +38,75 @@ const Post = mongoose.Schema({
   comments: [{type: mongoose.Schema.Types.ObjectId, ref:"comments"}],
 })
  
+// const User = mongoose.Schema({
+//   userName: {type: String, required: true},
+//   email: {type: String, required: true, unique: true},
+//   password:{type: String, required: true},
+//   admin: {type: Boolean, default: false},
+//   image: {type: String},
+//   // posts: [{type: mongoose.Schema.Types.ObjectId, ref:"post"}]
+// }) 
+
 const User = mongoose.Schema({
-  userName: {type: String, required: true},
-  email: {type: String, required: true, unique: true},
-  password:{type: String, required: true},
-  admin: {type: Boolean, default: false},
-  image: {type: String},
-  // posts: [{type: mongoose.Schema.Types.ObjectId, ref:"post"}]
+  avatar: {
+    type: String,
+    required: false // Или true, если аватар обязателен
+},
+username: {
+    type: String,
+    required: true,
+    unique: true // Предполагая, что имя пользователя должно быть уникальным
+},
+quote: {
+    type: String,
+    required: false
+},
+firstName: {
+    type: String,
+    required: true
+},
+lastName: {
+    type: String,
+    required: true
+},
+middleName: {
+    type: String,
+    required: false // Если среднее имя не является обязательным
+},
+phone: {
+    type: String,
+    required: false
+},
+city: {
+    type: String,
+    required: false
+},
+about: {
+    type: String,
+    required: false // Можно добавить ограничение на длину, если нужно
+},
+email: {
+    type: String,
+    required: true,
+    unique: true, // Предполагая, что email должен быть уникальным
+    match: /.+\@.+\..+/ // Обычное выражение для проверки формата email
+},
+tags: [{
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'Tag' // Ссылка на модель Tag
+}]
+
 }) 
+
+const Tag = mongoose.Schema({
+  tag: {type: String},
+})
  
 export const Posts = mongoose.model('posts', Post)
  
 export const Users = mongoose.model('users', User);
+
+export const Tagss = mongoose.model('tags', Tag);
  
 // app.get('/', (req, res) => {
 //   res.send('<h1>Hello world</h1>');
