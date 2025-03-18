@@ -29,74 +29,81 @@ mongoose.connect('mongodb://localhost:27017/cyberForum')
 .then(() => console.log("Connected to yourDB-name database"))
 .catch((err) => console.log(err));
  
-const Post = mongoose.Schema({
-  user:{type: mongoose.Schema.Types.ObjectId, ref:"users"},
-  title: {type: String},
-  description: {type: String},
-  datePublication:{type:String},
-  tags: [{type: mongoose.Schema.Types.ObjectId, ref:"tags"}],
-  comments: [{type: mongoose.Schema.Types.ObjectId, ref:"comments"}],
-})
- 
+
 // const User = mongoose.Schema({
-//   userName: {type: String, required: true},
-//   email: {type: String, required: true, unique: true},
-//   password:{type: String, required: true},
-//   admin: {type: Boolean, default: false},
-//   image: {type: String},
-//   // posts: [{type: mongoose.Schema.Types.ObjectId, ref:"post"}]
-// }) 
-
-const User = mongoose.Schema({
-  avatar: {
-    type: String,
-    required: false // Или true, если аватар обязателен
-},
-username: {
-    type: String,
-    required: true,
-    unique: true // Предполагая, что имя пользователя должно быть уникальным
-},
-quote: {
-    type: String,
-    required: false
-},
-firstName: {
-    type: String,
-    required: true
-},
-lastName: {
-    type: String,
-    required: true
-},
-middleName: {
-    type: String,
-    required: false // Если среднее имя не является обязательным
-},
-phone: {
-    type: String,
-    required: false
-},
-city: {
-    type: String,
-    required: false
-},
-about: {
-    type: String,
-    required: false // Можно добавить ограничение на длину, если нужно
-},
-email: {
-    type: String,
-    required: true,
-    unique: true, // Предполагая, что email должен быть уникальным
-    match: /.+\@.+\..+/ // Обычное выражение для проверки формата email
-},
-tags: [{
-  type: mongoose.Schema.Types.ObjectId,
-  ref: 'Tag' // Ссылка на модель Tag
-}]
-
-}) 
+  //   userName: {type: String, required: true},
+  //   email: {type: String, required: true, unique: true},
+  //   password:{type: String, required: true},
+  //   admin: {type: Boolean, default: false},
+  //   image: {type: String},
+  //   // posts: [{type: mongoose.Schema.Types.ObjectId, ref:"post"}]
+  // }) 
+  const Post = mongoose.Schema({
+    user:{type: mongoose.Schema.Types.ObjectId, ref:"users"},
+    title: {type: String},
+    description: {type: String},
+    datePublication:{type:String},
+    tags: [{type: mongoose.Schema.Types.ObjectId, ref:"tags"}],
+    comments: [{type: mongoose.Schema.Types.ObjectId, ref:"comments"}],
+  })
+  
+  const User = mongoose.Schema({
+    avatar: {
+        type: String,
+        required: false // Или true, если аватар обязателен
+    },
+    userName: {
+        type: String,
+        required: true,
+        unique: true // Предполагая, что имя пользователя должно быть уникальным
+    },
+    password: {
+      type: String,
+      required: false
+  },
+    quote: {
+        type: String,
+        required: false
+    },
+    firstName: {
+        type: String,
+        required: false
+    },
+    lastName: {
+        type: String,
+        required: false
+    },
+    middleName: {
+        type: String,
+        required: false // Если среднее имя не является обязательным
+    },
+    phone: {
+        type: String,
+        required: false
+    },
+    city: {
+        type: String,
+        required: false
+    },
+    about: {
+        type: String,
+        required: false // Можно добавить ограничение на длину, если нужно
+    },
+    email: {
+        type: String,
+        required: false,
+        unique: true, // Предполагая, что email должен быть уникальным
+        match: /.+\@.+\..+/ // Обычное выражение для проверки формата email
+    },
+    tags: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Tag' // Ссылка на модель Tag
+    }],
+    posts: [{ // Добавляем поле для связи с постами
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Post' // Ссылка на модель Post
+    }]
+});
 
 const Tag = mongoose.Schema({
   tag: {type: String},
@@ -202,6 +209,26 @@ app.post("/api/addPost", upload.single('image'), async (req, res) => {
     res.send("Something Went Wrong");
   }
 
+});
+
+// PATCH endpoint to update user
+app.patch('/api/changeuser/:id', async (req, res) => {
+  const { id } = req.params;
+  const updateData = req.body;
+  console.log("sffddd");
+  try {
+      const updatedUser = await Users.findByIdAndUpdate(id, updateData, {
+          new: true, // return the updated document
+          runValidators: true, // validate the update against the schema
+      });
+      if (!updatedUser) {
+          return res.status(404).send('User not found');
+      }
+      res.status(200).json(updatedUser);
+  } catch (error) {
+      console.error('Error updating user:', error);
+      res.status(500).send('Server error');
+  }
 });
  
 const PORT = 5000;
