@@ -10,17 +10,17 @@ const app = express();
 const server = createServer(app);
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    cb(null, 'Image/');
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + path.extname(file.originalname));
   },
 });
-const upload = multer({ storage })
+const upload = multer({ storage });
  
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/Image', express.static(path.join(__dirname, 'Image')));
  
 app.use(cors());
 app.use(express.json());
@@ -95,10 +95,10 @@ mongoose.connect('mongodb://localhost:27017/cyberForum')
         unique: true, // Предполагая, что email должен быть уникальным
         match: /.+\@.+\..+/ // Обычное выражение для проверки формата email
     },
-    tags: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Tag' // Ссылка на модель Tag
-    }],
+tags: {
+        type: [String],
+        default: []
+    },
     posts: [{ // Добавляем поле для связи с постами
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Post' // Ссылка на модель Post
@@ -212,15 +212,44 @@ app.post("/api/addPost", upload.single('image'), async (req, res) => {
 });
 
 // PATCH endpoint to update user
-app.patch('/api/changeuser/:id', async (req, res) => {
+// PATCH endpoint to update user with image upload
+app.patch('/api/changeuser/:id', upload.single('avatar'), async (req, res) => {
   const { id } = req.params;
   const updateData = req.body;
-  console.log("sffddd");
+  
   try {
-      const updatedUser = await Users.findByIdAndUpdate(id, updateData, {
-          new: true, // return the updated document
-          runValidators: true, // validate the update against the schema
-      });
+    // If was uploaded file avatar, add path to file in updateData
+    if (req.file) {
+      updateData.avatar = `Image/${req.file.filename}`;
+    }
+    // Handle tags if they were sent
+    if (updateData.tags) {
+      try {
+        // Convert tags string to array if it's a string
+        // updateData.tags = typeof updateData.tags === 'string' 
+        // ? JSON.parse(updateData.tags)
+        // : updateData.tags;
+        
+        //  JSON.parse(updateData.tags)
+        // : updateData.tags;
+        
+        console.log(updateData.tags);
+        updateData.tags  = updateData.tags.split(',').map(item => item.trim());
+        // updateData.tags = Array.isArray(updateData.tags) ? updateData.tags : [updateData.tags];
+        // Ensure tags is an array
+        // updateData.tags = Array.isArray(updateData.tags) ? updateData.tags : [updateData.tags];
+      } catch (error) {
+        return res.status(400).json({ error: 'Invalid tags format' });
+      }
+    }
+    const updatedUser = await Users.findByIdAndUpdate(
+      id, 
+      updateData,
+      {
+      new: true, // return updated document
+        runValidators: true // validate update against schema
+      }
+    );
       if (!updatedUser) {
           return res.status(404).send('User not found');
       }
