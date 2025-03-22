@@ -30,14 +30,7 @@ mongoose.connect('mongodb://localhost:27017/cyberForum')
 .catch((err) => console.log(err));
  
 
-// const User = mongoose.Schema({
-  //   userName: {type: String, required: true},
-  //   email: {type: String, required: true, unique: true},
-  //   password:{type: String, required: true},
-  //   admin: {type: Boolean, default: false},
-  //   image: {type: String},
-  //   // posts: [{type: mongoose.Schema.Types.ObjectId, ref:"post"}]
-  // }) 
+
   const Post = mongoose.Schema({
     user:{type: mongoose.Schema.Types.ObjectId, ref:"users"},
     title: {type: String},
@@ -95,10 +88,10 @@ mongoose.connect('mongodb://localhost:27017/cyberForum')
         unique: true, // Предполагая, что email должен быть уникальным
         match: /.+\@.+\..+/ // Обычное выражение для проверки формата email
     },
-tags: {
-        type: [String],
-        default: []
-    },
+    tags: {
+      type: [String],
+      default: []
+  },
     posts: [{ // Добавляем поле для связи с постами
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Post' // Ссылка на модель Post
@@ -106,7 +99,10 @@ tags: {
 });
 
 const Tag = mongoose.Schema({
-  tag: {type: String},
+  tag: {
+    type: String,
+    unique: true,},
+  tagCount : {type: Number} 
 })
  
 export const Posts = mongoose.model('posts', Post)
@@ -218,7 +214,16 @@ app.patch('/api/changeuser/:id', upload.single('avatar'), async (req, res) => {
   const updateData = req.body;
   
   try {
-    // If was uploaded file avatar, add path to file in updateData
+    // Если был загружен файл аватара, добавляем путь к файлу в updateData
+    
+    // const updatedUser = await Users.findByIdAndUpdate(
+    //   id, 
+    //   updateData,
+    //   {
+    //   new: true, // return updated document
+    //     runValidators: true // validate update against schema
+    //   }
+    // );
     if (req.file) {
       updateData.avatar = `Image/${req.file.filename}`;
     }
@@ -260,6 +265,9 @@ app.patch('/api/changeuser/:id', upload.single('avatar'), async (req, res) => {
   }
 });
  
+// Эндпоинт для создания/получения тега
+
+
 const PORT = 5000;
  
 server.listen(PORT, () => {
