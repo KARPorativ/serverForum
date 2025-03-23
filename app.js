@@ -105,12 +105,27 @@ const Tag = mongoose.Schema({
   tagCount : {type: Number} 
 })
  
+const Comment = mongoose.Schema({
+  user: {type: mongoose.Schema.Types.ObjectId, ref:"users"},
+  post: {type: mongoose.Schema.Types.ObjectId, ref:"posts"},
+  tags: [{type: mongoose.Schema.Types.ObjectId, ref:"tags"}],
+  image: {
+    type: String,
+    required: false 
+},
+  text: {type: String, required: true},
+  datePublication: {type: String},
+  likes: [{type: mongoose.Schema.Types.ObjectId, ref:"users"}]
+})
+
 export const Posts = mongoose.model('posts', Post)
  
 export const Users = mongoose.model('users', User);
 
 export const Tagss = mongoose.model('tags', Tag);
  
+export const Comments = mongoose.model('comments', Comment);
+
 // app.get('/', (req, res) => {
 //   res.send('<h1>Hello world</h1>');
 // });
