@@ -36,7 +36,8 @@ const Post = mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
   title: { type: String },
   description: { type: String },
-  datePublication: { type: String, default: Date.now() },
+  datePublication: { type: Date, default: Date.now() },
+  likesCount: {type: Number},
   tags: [{ type: mongoose.Schema.Types.ObjectId, ref: "tags" }],
   comments: [{ type: mongoose.Schema.Types.ObjectId, ref: "comments" }],
 })
@@ -144,6 +145,66 @@ export const Comments = mongoose.model('comments', Comment);
 //   });
 //   console.log(login, password);
 // });
+
+// app.get("/api/post/:id", async (req, res) => {
+//   try {
+//     const postId = req.params.id;
+//     console.log(postId,"ser");
+
+//     // Находим пост по ID и подтягиваем связанные данные (пользователя и комментарии)
+//     const post = await Posts.findById(postId)
+//       .populate("user", "avatar userName")
+//       .populate({
+//         path: "comments", // Заполняем комментарии
+//         populate: { path: "user", select: "userName" }, // Подтягиваем данные комментаторов
+//       })
+//       .exec();
+
+//     if (!post) {
+//       return res.status(404).json({ message: "Ошибка: Пост не найден" });
+//     }
+
+//     res.json(post);
+//   } catch (error) {
+//     console.error("Ошибка при получении поста:", error);
+//     res.status(500).json({ message: "Ошибка сервера" });
+//   }
+// });
+
+app.get('/api/post/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Поиск поста в базе данных с его отношениями
+    const post = await Posts.findById(id)
+      .populate({
+        path: 'user', // Подгрузка пользователя
+        select: 'avatar userName', // Выбираем только аватар и имя пользователя
+      })
+      .populate({
+        path: 'comments', // Подгрузка комментариев
+        populate: { 
+          path: 'user', // Также подгружаем пользователей из комментариев
+          select: 'userName avatar'
+        },
+      })
+      .populate({
+        path: 'tags', // Подгрузка тегов
+        select: 'tag',
+      })
+      .exec();
+
+    if (!post) {
+      return res.status(404).json({ message: "Пост не найден" });
+    }
+    // console.log(post);
+    res.status(200).json(post);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Ошибка сервера" });
+  }
+});
+
 app.post('/api/login', async (req, res) => {
   const { userName, password } = req.body;
   const user = await Users.findOne({ userName });
