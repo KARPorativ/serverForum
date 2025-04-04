@@ -33,9 +33,11 @@ mongoose.connect('mongodb://127.0.0.1:27017/cyberForum')
 
 
 const Post = mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
+  author: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
   title: { type: String },
   description: { type: String },
+  datePublication: { type: String, default: Date.now() },
+  image: { type: String },
   datePublication: { type: Date, default: Date.now() },
   likesCount: {type: Number},
   tags: [{ type: mongoose.Schema.Types.ObjectId, ref: "tags" }],
@@ -109,9 +111,8 @@ const Tag = mongoose.Schema({
 })
 
 const Comment = mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
+  author: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
   post: { type: mongoose.Schema.Types.ObjectId, ref: "posts" },
-  tags: [{ type: mongoose.Schema.Types.ObjectId, ref: "tags" }],
   image: {
     type: String,
     required: false
@@ -129,22 +130,7 @@ export const Tagss = mongoose.model('tags', Tag);
 
 export const Comments = mongoose.model('comments', Comment);
 
-// app.get('/', (req, res) => {
-//   res.send('<h1>Hello world</h1>');
-// });
 
-// app.get("/api/getUser", ({ query: { login, password } }, res) => {
-//   Users.findOne({ login, password }).then((user) => {
-//     if (user !== null) {
-//       res.json(user);
-//       // console.log(user)
-//       // res.json(true);
-//     } else {
-//       res.json(false);
-//     }
-//   });
-//   console.log(login, password);
-// });
 
 // app.get("/api/post/:id", async (req, res) => {
 //   try {
@@ -175,16 +161,19 @@ app.get('/api/post/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
+    // if (req.file) {
+    //   updateData.avatar = `Image/${req.file.filename}`;
+    // }
     // Поиск поста в базе данных с его отношениями
     const post = await Posts.findById(id)
       .populate({
-        path: 'user', // Подгрузка пользователя
+        path: 'author', // Подгрузка пользователя
         select: 'avatar userName', // Выбираем только аватар и имя пользователя
       })
       .populate({
         path: 'comments', // Подгрузка комментариев
         populate: { 
-          path: 'user', // Также подгружаем пользователей из комментариев
+          path: 'author', // Также подгружаем пользователей из комментариев
           select: 'userName avatar'
         },
       })
@@ -216,23 +205,70 @@ app.post('/api/login', async (req, res) => {
   } else {
     return res.status(400).json({ message: 'Неверный пароль.' });
   }
-
-  // const isMatch = await bcrypt.compare(password, user.password);
-
-  // if (!isMatch) {
-  //     return res.status(400).json({ message: 'Неверный пароль.' });
-  // }else{
-  //   res.json(user);
-  // }
-
-  // const token = jwt.sign({ id: user._id }, 'your_jwt_secret', { expiresIn: '1h' });
-  // res.json({ token });
 });
+
+app.get('/api/getPostsWithParams', async (req, res) => {
+  try {
+    const { title, author, sort, tags } = req.query;
+    console.log('kl', req.query);
+
+    // Создаем базовый запрос
+    let query = Posts.find();
+
+    // Фильтрация по заголовку
+    if (title) {
+      query = query.where('title').regex(new RegExp(title, 'i'));
+    }
+
+    // Фильтрация по автору
+    if (author) {
+      console.log('author', author);
+      const users = await Users.find({
+        userName: { $regex: new RegExp(author, 'i') }
+      });
+      console.log('users', users);
+      const userIds = users.map(user => user._id);
+      query = query.where('author').in(userIds);
+    }
+
+    // Фильтрация по тегам
+    if (tags) {
+      const tagsArray = Array.isArray(tags) ? tags : tags.split(',');
+      
+      // Получаем _id для каждого тега
+      const tagDocs = await Tagss.find({ tag: { $in: tagsArray } }).select('_id').exec();
+      console.log('karp', tagDocs);
+      const tagIds = tagDocs.map(tag => tag._id); // Получаем массив _id тегов
+
+      // Теперь используем _id для запроса
+      query = query.where('tags').all(tagIds);
+    }
+
+    // Сортировка
+    const sortOrder = sort === 'desc' ? -1 : 1;
+    query = query.sort({ createdAt: sortOrder });
+
+    // Выполняем запрос
+    const posts = await query.exec();
+
+    res.json(posts);
+  } catch (error) {
+    console.error('Error fetching posts:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 
 app.get('/api/getPost', async (req, res) => {
   // const post = req.query;
   const post = await Posts.find();
   res.json(post);
+})
+
+app.get('/api/getTags', async (req, res) => {
+  // const post = req.query;
+  const tags = await Tagss.find();
+  res.json(tags);
 })
 
 
@@ -261,33 +297,45 @@ app.post('/api/register', async (req, res) => {
   return res.status(201).json({ message: 'Пользователь зарегистрирован успешно.' });
 });
 
-// app.post("/api/createPost", upload.single('image'), async (req, res) => {
-//   try {
-//     console.log('post')
-//     console.log('fgld', req.body)
-//     const smens = new Posts(req.body);
-//     console.log("smens", smens);
-//     let result = await smens.save();
-//     result = result.toObject();
+app.post("/api/post/:_id/comment", async (req, res) => {
+  try {
+    const postId = req.params._id;
+    const { text, idUser } = req.body;
 
-//     // Теперь используем метод populate для заполнения пользователя
-//     const populatedResult = await Smens.findById(result._id).populate('user');
+    if (!text) {
+      return res.status(400).json({ message: "Комментарий не может быть пустым" });
+    }
 
-//     if (populatedResult) {
-//       res.send(populatedResult);
-//       console.log('result', populatedResult);
-//     } else {
-//       console.log("Posts already registered");
-//     }
-//   } catch (e) {
-//     res.send("Something Went Wrong");
-//   }
+    const newComment = new Comments({
+      post: postId,
+      text, // Текст комментария из запроса
+    });
 
-// });
+    const savedComment = await newComment.save();
+
+    // Теперь обновим пост, добавив ссылку на комментарий
+    const post = await Posts.findById(postId);
+    console.log(post);
+    post.comments.push(savedComment._id);
+    await post.save();
+
+    const user = await Users.findById(idUser);
+    console.log(user);
+    user.comments.push(savedComment._id);
+    await user.save();
+
+    res.status(201).json(savedComment); // Отправляем сохраненный комментарий обратно клиенту
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Ошибка при добавлении комментария" });
+  }
+});
 
 app.post("/api/createPost", upload.single('image'), async (req, res) => {
   try {
-    const { title, content, tags, _id } = req.body;
+    const { title, content, image, tags, author } = req.body;
+    console.log('req.body', req.body);  
+    console.log('file', req.file);
     // const userId = req.user._id; // Предполагаем аутентификацию
 
     // Парсинг и валидация тегов
@@ -313,11 +361,11 @@ app.post("/api/createPost", upload.single('image'), async (req, res) => {
 
     // Создание поста
     const newPost = new Posts({
-      user: _id,
+      author,
       title,
       description: content,
       tags: tagIds,
-      image: req.file ? `/uploads/posts/${req.file.filename}` : null,
+      image: req.file ? `http://localhost:5000/uploads/posts/${req.file.filename}` : null,
       datePublication: new Date()
     });
 
@@ -325,13 +373,13 @@ app.post("/api/createPost", upload.single('image'), async (req, res) => {
     let savedPost = await newPost.save();
 
     // Обновление пользователя
-    await Users.findByIdAndUpdate(_id, {
-      $push: { posts: savedPost._id }
+    await Users.findByIdAndUpdate(author, {
+      $push: { posts: savedPost._id } //нужно ли менять _id на author?
     });
 
     // Получение полного объекта с populate
     const populatedPost = await Posts.findById(savedPost._id)
-      .populate('user')
+      .populate('author')
       .populate('tags');
 
     res.status(201).json(populatedPost);
