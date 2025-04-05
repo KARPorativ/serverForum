@@ -302,13 +302,28 @@ app.post("/api/post/:_id/comment", async (req, res) => {
     const postId = req.params._id;
     const { text, idUser } = req.body;
 
+    console.log(idUser,"id user");
     if (!text) {
       return res.status(400).json({ message: "Комментарий не может быть пустым" });
     }
 
+    const timestamp = 1743767934054; // метка времени в миллисекундах
+  const date = new Date(timestamp); // конвертация в объект даты
+
+  // получение дня, месяца и года
+  const day = date.getDate().toString().padStart(2, '0'); // добавляем ведущий ноль
+  const month = (date.getMonth() + 1).toString().padStart(2, '0'); // месяцы начинаются с 0, поэтому +1
+  const year = date.getFullYear();
+
+  // формируем строку в формате "дд-мм-гггг"
+  const formattedDate = `${day}-${month}-${year}`;
+
     const newComment = new Comments({
       post: postId,
-      text, // Текст комментария из запроса
+      text,
+      author: idUser,
+      datePublication:formattedDate,
+       // Текст комментария из запроса
     });
 
     const savedComment = await newComment.save();
@@ -318,13 +333,23 @@ app.post("/api/post/:_id/comment", async (req, res) => {
     console.log(post);
     post.comments.push(savedComment._id);
     await post.save();
+    
+    const populatedComment = await Comments.findById(savedComment._id)
+    .populate({
+      path: 'author', // Подгрузка комментариев
+      
+        select: 'userName avatar'
+   
+    })
+      // .populate('author')
+      // .populate('post');
+    // const user = await Users.findById(idUser);
+    // console.log(user);
+    // user.comments.push(savedComment._id);
+    // await user.save();
 
-    const user = await Users.findById(idUser);
-    console.log(user);
-    user.comments.push(savedComment._id);
-    await user.save();
-
-    res.status(201).json(savedComment); // Отправляем сохраненный комментарий обратно клиенту
+    // res.status(201).json(savedComment); // Отправляем сохраненный комментарий обратно клиенту
+    res.status(201).json(populatedComment);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Ошибка при добавлении комментария" });
