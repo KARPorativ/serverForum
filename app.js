@@ -122,6 +122,12 @@ const Comment = mongoose.Schema({
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }]
 })
 
+const LikePost = mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "users"  },
+  post: { type: mongoose.Schema.Types.ObjectId, ref: "posts" },
+  
+})
+
 export const Posts = mongoose.model('posts', Post)
 
 export const Users = mongoose.model('users', User);
@@ -129,6 +135,8 @@ export const Users = mongoose.model('users', User);
 export const Tagss = mongoose.model('tags', Tag);
 
 export const Comments = mongoose.model('comments', Comment);
+
+export const LikePosts = mongoose.model('likePosts', LikePost);
 
 
 
@@ -350,6 +358,50 @@ app.post("/api/post/:_id/comment", async (req, res) => {
 
     // res.status(201).json(savedComment); // Отправляем сохраненный комментарий обратно клиенту
     res.status(201).json(populatedComment);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Ошибка при добавлении комментария" });
+  }
+});
+
+app.post("/api/post/:_id/likePost", async (req, res) => {
+  // сделать post запрос который получает id usera и posta, записывает в таблицу likePost нровую запись и перещитывает в  таблице Post количество лайков
+  try {
+    const postId = req.params._id;
+    const { idUser } = req.body;
+
+    const newLike = new LikePosts({
+      post: postId,
+      user: idUser,
+    });
+    const savedLike = await newLike.save();
+
+    const count = await LikePosts.countDocuments({ user: idUser });
+    console.log(count,"count")
+
+    // Теперь обновим пост, добавив ссылку на комментарий
+    // const post = await LikePosts.findById(postId);
+    console.log(idUser,'idUser');
+    console.log(postId,'post');
+    // post.comments.push(savedComment._id);
+    // await post.save();
+    
+    // const populatedComment = await Comments.findById(savedComment._id)
+    // .populate({
+    //   path: 'author', // Подгрузка комментариев
+      
+    //     select: 'userName avatar'
+   
+    // })
+      // .populate('author')
+      // .populate('post');
+    // const user = await Users.findById(idUser);
+    // console.log(user);
+    // user.comments.push(savedComment._id);
+    // await user.save();
+
+    // res.status(201).json(savedComment); // Отправляем сохраненный комментарий обратно клиенту
+    res.status(201).json(count);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Ошибка при добавлении комментария" });
