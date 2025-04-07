@@ -42,6 +42,7 @@ const Post = mongoose.Schema({
   likesCount: { type: Number, default: 0 },
   tags: [{ type: mongoose.Schema.Types.ObjectId, ref: "tags" }],
   comments: [{ type: mongoose.Schema.Types.ObjectId, ref: "comments" }],
+  likePosts: [{ type: mongoose.Schema.Types.ObjectId, ref: "likePosts" }],
 })
 
 const User = mongoose.Schema({
@@ -374,42 +375,35 @@ app.post("/api/post/:_id/likePost", async (req, res) => {
     const postId = req.params._id;
     const { idUser } = req.body;
 
-    const newLike = new LikePosts({
-      post: postId,
-      user: idUser,
-    });
-    const savedLike = await newLike.save();
-
+    
     const user = await Users.findById(idUser).populate('likePosts');
     console.log("fffffffffffff");
-    console.log(user.likePosts.user, "user.likePosts.user");
+    // console.log(user.likePosts.user, "user.likePosts.user");
     console.log(idUser, "idUser");
-    if (user.likePosts.user === idUser) {
-
+    const post = await Posts.findById(postId).populate('likePosts');
+    
+    if (post.likePosts.some(post => post.user == idUser)) {
+      console.log("ID найден!");
     } else {
+      console.log("ID не найден.");
+      
+      const newLike = new LikePosts({
+        post: postId,
+        user: idUser,
+      });
+      const savedLike = await newLike.save();
+      
       user.likePosts.push(savedLike._id);
       await user.save();
-
-      const post = await Posts.findById(postId);
-
+      post.likePosts.push(savedLike._id);
+      
       post.likesCount++;
-
       await post.save();
       res.status(201).json(post.likesCount);
     }
-
-
+    
     // const count = await LikePosts.countDocuments({ user: idUser });
     // console.log(count,"count");
-
-
-
-
-
-    console.log(idUser, 'idUser');
-    console.log(postId, 'post');
-
-    
 
   } catch (err) {
     console.error(err);
@@ -417,44 +411,14 @@ app.post("/api/post/:_id/likePost", async (req, res) => {
   }
 });
 
-app.post("/api/post/:_id/getLikePost", async (req, res) => {
+app.get("/api/post/:_id/getLikePost", async (req, res) => {
   // сделать post запрос который получает id usera и posta, записывает в таблицу likePost нровую запись и перещитывает в  таблице Post количество лайков
   try {
     const postId = req.params._id;
-    const { idUser } = req.body;
 
-    const newLike = new LikePosts({
-      post: postId,
-      user: idUser,
-    });
-    const savedLike = await newLike.save();
-
-    const count = await LikePosts.countDocuments({ user: idUser });
-    console.log(count, "count")
-
-    // Теперь обновим пост, добавив ссылку на комментарий
-    // const post = await LikePosts.findById(postId);
-    console.log(idUser, 'idUser');
-    console.log(postId, 'post');
-    // post.comments.push(savedComment._id);
-    // await post.save();
-
-    // const populatedComment = await Comments.findById(savedComment._id)
-    // .populate({
-    //   path: 'author', // Подгрузка комментариев
-
-    //     select: 'userName avatar'
-
-    // })
-    // .populate('author')
-    // .populate('post');
-    // const user = await Users.findById(idUser);
-    // console.log(user);
-    // user.comments.push(savedComment._id);
-    // await user.save();
-
-    // res.status(201).json(savedComment); // Отправляем сохраненный комментарий обратно клиенту
-    res.status(201).json(count);
+    const post = await Posts.findById(postId)
+    console.log("--------------------");
+    res.status(201).json(post.likesCount);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Ошибка при добавлении комментария" });
