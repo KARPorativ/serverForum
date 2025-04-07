@@ -39,7 +39,7 @@ const Post = mongoose.Schema({
   datePublication: { type: String, default: Date.now() },
   image: { type: String },
   datePublication: { type: Date, default: Date.now() },
-  likesCount: {type: Number},
+  likesCount: { type: Number, default: 0 },
   tags: [{ type: mongoose.Schema.Types.ObjectId, ref: "tags" }],
   comments: [{ type: mongoose.Schema.Types.ObjectId, ref: "comments" }],
 })
@@ -96,6 +96,10 @@ const User = mongoose.Schema({
     type: [String],
     default: []
   },
+  likePosts: [{ // Добавляем поле для связи с постами
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'likePosts' // Ссылка на модель Post
+  }],
   posts: [{ // Добавляем поле для связи с постами
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Post' // Ссылка на модель Post
@@ -123,9 +127,9 @@ const Comment = mongoose.Schema({
 })
 
 const LikePost = mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "users"  },
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
   post: { type: mongoose.Schema.Types.ObjectId, ref: "posts" },
-  
+
 })
 
 export const Posts = mongoose.model('posts', Post)
@@ -180,7 +184,7 @@ app.get('/api/post/:id', async (req, res) => {
       })
       .populate({
         path: 'comments', // Подгрузка комментариев
-        populate: { 
+        populate: {
           path: 'author', // Также подгружаем пользователей из комментариев
           select: 'userName avatar'
         },
@@ -242,7 +246,7 @@ app.get('/api/getPostsWithParams', async (req, res) => {
     // Фильтрация по тегам
     if (tags) {
       const tagsArray = Array.isArray(tags) ? tags : tags.split(',');
-      
+
       // Получаем _id для каждого тега
       const tagDocs = await Tagss.find({ tag: { $in: tagsArray } }).select('_id').exec();
       console.log('karp', tagDocs);
@@ -310,28 +314,28 @@ app.post("/api/post/:_id/comment", async (req, res) => {
     const postId = req.params._id;
     const { text, idUser } = req.body;
 
-    console.log(idUser,"id user");
+    console.log(idUser, "id user");
     if (!text) {
       return res.status(400).json({ message: "Комментарий не может быть пустым" });
     }
 
     const timestamp = 1743767934054; // метка времени в миллисекундах
-  const date = new Date(timestamp); // конвертация в объект даты
+    const date = new Date(timestamp); // конвертация в объект даты
 
-  // получение дня, месяца и года
-  const day = date.getDate().toString().padStart(2, '0'); // добавляем ведущий ноль
-  const month = (date.getMonth() + 1).toString().padStart(2, '0'); // месяцы начинаются с 0, поэтому +1
-  const year = date.getFullYear();
+    // получение дня, месяца и года
+    const day = date.getDate().toString().padStart(2, '0'); // добавляем ведущий ноль
+    const month = (date.getMonth() + 1).toString().padStart(2, '0'); // месяцы начинаются с 0, поэтому +1
+    const year = date.getFullYear();
 
-  // формируем строку в формате "дд-мм-гггг"
-  const formattedDate = `${day}-${month}-${year}`;
+    // формируем строку в формате "дд-мм-гггг"
+    const formattedDate = `${day}-${month}-${year}`;
 
     const newComment = new Comments({
       post: postId,
       text,
       author: idUser,
-      datePublication:formattedDate,
-       // Текст комментария из запроса
+      datePublication: formattedDate,
+      // Текст комментария из запроса
     });
 
     const savedComment = await newComment.save();
@@ -341,16 +345,16 @@ app.post("/api/post/:_id/comment", async (req, res) => {
     console.log(post);
     post.comments.push(savedComment._id);
     await post.save();
-    
+
     const populatedComment = await Comments.findById(savedComment._id)
-    .populate({
-      path: 'author', // Подгрузка комментариев
-      
+      .populate({
+        path: 'author', // Подгрузка комментариев
+
         select: 'userName avatar'
-   
-    })
-      // .populate('author')
-      // .populate('post');
+
+      })
+    // .populate('author')
+    // .populate('post');
     // const user = await Users.findById(idUser);
     // console.log(user);
     // user.comments.push(savedComment._id);
@@ -376,25 +380,74 @@ app.post("/api/post/:_id/likePost", async (req, res) => {
     });
     const savedLike = await newLike.save();
 
+    const user = await Users.findById(idUser).populate('likePosts');
+    console.log("fffffffffffff");
+    console.log(user.likePosts.user, "user.likePosts.user");
+    console.log(idUser, "idUser");
+    if (user.likePosts.user === idUser) {
+
+    } else {
+      user.likePosts.push(savedLike._id);
+      await user.save();
+
+      const post = await Posts.findById(postId);
+
+      post.likesCount++;
+
+      await post.save();
+      res.status(201).json(post.likesCount);
+    }
+
+
+    // const count = await LikePosts.countDocuments({ user: idUser });
+    // console.log(count,"count");
+
+
+
+
+
+    console.log(idUser, 'idUser');
+    console.log(postId, 'post');
+
+    
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Ошибка при добавлении комментария" });
+  }
+});
+
+app.post("/api/post/:_id/getLikePost", async (req, res) => {
+  // сделать post запрос который получает id usera и posta, записывает в таблицу likePost нровую запись и перещитывает в  таблице Post количество лайков
+  try {
+    const postId = req.params._id;
+    const { idUser } = req.body;
+
+    const newLike = new LikePosts({
+      post: postId,
+      user: idUser,
+    });
+    const savedLike = await newLike.save();
+
     const count = await LikePosts.countDocuments({ user: idUser });
-    console.log(count,"count")
+    console.log(count, "count")
 
     // Теперь обновим пост, добавив ссылку на комментарий
     // const post = await LikePosts.findById(postId);
-    console.log(idUser,'idUser');
-    console.log(postId,'post');
+    console.log(idUser, 'idUser');
+    console.log(postId, 'post');
     // post.comments.push(savedComment._id);
     // await post.save();
-    
+
     // const populatedComment = await Comments.findById(savedComment._id)
     // .populate({
     //   path: 'author', // Подгрузка комментариев
-      
+
     //     select: 'userName avatar'
-   
+
     // })
-      // .populate('author')
-      // .populate('post');
+    // .populate('author')
+    // .populate('post');
     // const user = await Users.findById(idUser);
     // console.log(user);
     // user.comments.push(savedComment._id);
@@ -411,7 +464,7 @@ app.post("/api/post/:_id/likePost", async (req, res) => {
 app.post("/api/createPost", upload.single('image'), async (req, res) => {
   try {
     const { title, content, image, tags, author } = req.body;
-    console.log('req.body', req.body);  
+    console.log('req.body', req.body);
     console.log('file', req.file);
     // const userId = req.user._id; // Предполагаем аутентификацию
 
