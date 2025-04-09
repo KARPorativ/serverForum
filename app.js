@@ -101,6 +101,10 @@ const User = mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'likePosts' // Ссылка на модель Post
   }],
+  likeComments: [{ // Добавляем поле для связи с постами
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'likeComments' // Ссылка на модель Post
+  }],
   posts: [{ // Добавляем поле для связи с постами
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Post' // Ссылка на модель Post
@@ -124,12 +128,18 @@ const Comment = mongoose.Schema({
   },
   text: { type: String, required: true },
   datePublication: { type: String },
-  likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }]
+  likeComments: [{ type: mongoose.Schema.Types.ObjectId, ref: "likeComments" }]
 })
 
 const LikePost = mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
   post: { type: mongoose.Schema.Types.ObjectId, ref: "posts" },
+
+})
+
+const LikeComment = mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
+  comment: { type: mongoose.Schema.Types.ObjectId, ref: "comments" },
 
 })
 
@@ -143,32 +153,8 @@ export const Comments = mongoose.model('comments', Comment);
 
 export const LikePosts = mongoose.model('likePosts', LikePost);
 
+export const LikeComments = mongoose.model('likeComments', LikeComment);
 
-
-// app.get("/api/post/:id", async (req, res) => {
-//   try {
-//     const postId = req.params.id;
-//     console.log(postId,"ser");
-
-//     // Находим пост по ID и подтягиваем связанные данные (пользователя и комментарии)
-//     const post = await Posts.findById(postId)
-//       .populate("user", "avatar userName")
-//       .populate({
-//         path: "comments", // Заполняем комментарии
-//         populate: { path: "user", select: "userName" }, // Подтягиваем данные комментаторов
-//       })
-//       .exec();
-
-//     if (!post) {
-//       return res.status(404).json({ message: "Ошибка: Пост не найден" });
-//     }
-
-//     res.json(post);
-//   } catch (error) {
-//     console.error("Ошибка при получении поста:", error);
-//     res.status(500).json({ message: "Ошибка сервера" });
-//   }
-// });
 
 app.get('/api/post/:id', async (req, res) => {
   try {
@@ -369,6 +355,48 @@ app.post("/api/post/:_id/comment", async (req, res) => {
   }
 });
 
+app.post("/api/post/:_id/likeComment", async (req, res) => {
+  // сделать post запрос который получает id usera и posta, записывает в таблицу likePost нровую запись и перещитывает в  таблице Post количество лайков
+  try {
+    const postId = req.params._id;
+    const { idUser } = req.body;
+
+    
+    const user = await Users.findById(idUser).populate('likePosts');
+    console.log("fffffffffffff");
+    // console.log(user.likePosts.user, "user.likePosts.user");
+    console.log(idUser, "idUser");
+    const post = await Posts.findById(postId).populate('likePosts');
+    
+    if (post.likePosts.some(post => post.user == idUser)) {
+      console.log("ID найден!");
+    } else {
+      console.log("ID не найден.");
+      
+      const newLike = new LikePosts({
+        post: postId,
+        user: idUser,
+      });
+      const savedLike = await newLike.save();
+      
+      user.likePosts.push(savedLike._id);
+      await user.save();
+      post.likePosts.push(savedLike._id);
+      
+      post.likesCount++;
+      await post.save();
+      res.status(201).json(post.likesCount);
+    }
+    
+    // const count = await LikePosts.countDocuments({ user: idUser });
+    // console.log(count,"count");
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Ошибка при добавлении комментария" });
+  }
+});
+
 app.post("/api/post/:_id/likePost", async (req, res) => {
   // сделать post запрос который получает id usera и posta, записывает в таблицу likePost нровую запись и перещитывает в  таблице Post количество лайков
   try {
@@ -491,35 +519,18 @@ app.patch('/api/changeuser/:id', upload.single('avatar'), async (req, res) => {
   const updateData = req.body;
 
   try {
-    // Если был загружен файл аватара, добавляем путь к файлу в updateData
-
-    // const updatedUser = await Users.findByIdAndUpdate(
-    //   id, 
-    //   updateData,
-    //   {
-    //   new: true, // return updated document
-    //     runValidators: true // validate update against schema
-    //   }
-    // );
+ 
     if (req.file) {
       updateData.avatar = `Image/${req.file.filename}`;
     }
-    // Handle tags if they were sent
+    
     if (updateData.tags) {
       try {
-        // Convert tags string to array if it's a string
-        // updateData.tags = typeof updateData.tags === 'string' 
-        // ? JSON.parse(updateData.tags)
-        // : updateData.tags;
-
-        //  JSON.parse(updateData.tags)
-        // : updateData.tags;
+        
 
         console.log(updateData.tags);
         updateData.tags = updateData.tags.split(',').map(item => item.trim());
-        // updateData.tags = Array.isArray(updateData.tags) ? updateData.tags : [updateData.tags];
-        // Ensure tags is an array
-        // updateData.tags = Array.isArray(updateData.tags) ? updateData.tags : [updateData.tags];
+       
       } catch (error) {
         return res.status(400).json({ error: 'Invalid tags format' });
       }
@@ -528,8 +539,8 @@ app.patch('/api/changeuser/:id', upload.single('avatar'), async (req, res) => {
       id,
       updateData,
       {
-        new: true, // return updated document
-        runValidators: true // validate update against schema
+        new: true, 
+        runValidators: true 
       }
     );
     if (!updatedUser) {
@@ -542,7 +553,7 @@ app.patch('/api/changeuser/:id', upload.single('avatar'), async (req, res) => {
   }
 });
 
-// Эндпоинт для создания/получения тега
+
 
 
 const PORT = 5000;
