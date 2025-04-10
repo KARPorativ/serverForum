@@ -107,7 +107,7 @@ const User = mongoose.Schema({
   }],
   posts: [{ // Добавляем поле для связи с постами
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Post' // Ссылка на модель Post
+    ref: 'posts' // Ссылка на модель Post
   }]
 });
 
@@ -167,7 +167,7 @@ app.get('/api/post/:id', async (req, res) => {
     const post = await Posts.findById(id)
       .populate({
         path: 'author', // Подгрузка пользователя
-        select: 'avatar userName', // Выбираем только аватар и имя пользователя
+        select: 'avatar userName avatar', // Выбираем только аватар и имя пользователя
       })
       .populate({
         path: 'comments', // Подгрузка комментариев
@@ -194,15 +194,36 @@ app.get('/api/post/:id', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  const { userName, password } = req.body;
-  const user = await Users.findOne({ userName });
+  try {
+    const { userName, password } = req.body;
+    
+    const user = await Users.findOne({ userName })
+      .populate({
+        path: 'posts',
+        populate: [
+          {
+            path: 'author',
+            select: 'userName avatar' // Подгружаем данные автора поста
+          },
+          {
+            path: 'tags',
+            select: 'tag' // Подгружаем теги поста
+          }
+        ]
+      });
 
-  if (!user) {
-    return res.status(400).json({ message: 'Пользователь не найден.' });
-  } else if (user && password == user.password) {
+    if (!user) {
+      return res.status(400).json({ message: 'Пользователь не найден.' });
+    }
+
+    if (password !== user.password) {
+      return res.status(400).json({ message: 'Неверный пароль.' });
+    }
+
     res.json(user);
-  } else {
-    return res.status(400).json({ message: 'Неверный пароль.' });
+  } catch (error) {
+    console.error('Ошибка при авторизации:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
   }
 });
 
