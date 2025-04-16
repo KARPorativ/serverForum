@@ -377,57 +377,110 @@ app.post("/api/post/:_id/comment", async (req, res) => {
   }
 });
 
+// app.post("/api/post/:_id/likeComment", async (req, res) => {
+//   // сделать post запрос который получает id usera и posta, записывает в таблицу likePost нровую запись и перещитывает в  таблице Post количество лайков
+//   try {
+//     const postId = req.params._id;
+//     const { idUser, idComment } = req.body;
+//     console.log("info:", postId, "info2", req.body);
+
+//     const user = await Users.findById(idUser).populate('likeComments');
+//     console.log("fffffffffffffddd");
+//     // console.log(user.likePosts.user, "user.likePosts.user");
+//     console.log(idUser, "idUser");
+//     // const post = await Posts.findById(postId).populate('comments').populate('likeComments');
+//     // const post = await Posts.findById(postId).populate({path:'comments',populate:{path:'likeComments'})});
+
+//     const comments = await Comments.find({ post: postId });
+
+//     // Составляем массив ID всех комментариев
+//     const commentIds = comments.map((comment) => comment._id);
+
+//     // Ищем лайки для этих комментариев
+//     const likes = await LikeComments.find({
+//       comment: { $in: commentIds },
+//     });
+
+//     const currentComment = await Comments.findOne({ _id: idComment });
+//     console.log(currentComment," ddddddddddssssssssssss");
+
+//     if (likes.some(post => post.user == idUser)) {
+//       console.log("ID найден!");
+//     } else {
+//       console.log("ID не найден.");
+//       console.log("tttttttttttttttttttfffftt.");
+//       const newComment = new LikeComments({
+//         comment: postId,//gggggggggggggggg
+//         user: idUser,
+//       });
+//       console.log("ttttttttttttttttttttt.");
+//       const savedComment = await newComment.save();
+      
+//       user.likeComments.push(savedComment._id);
+//       await user.save();
+//       // post.likeComments.push(savedComment._id);
+      
+//       // post.likesCount++;
+//       // await post.save();
+//       res.status(201).json(likes.likesCount);
+//     }
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: "Ошибка при добавлении комментария" });
+//   }
+// });
+
 app.post("/api/post/:_id/likeComment", async (req, res) => {
-  // сделать post запрос который получает id usera и posta, записывает в таблицу likePost нровую запись и перещитывает в  таблице Post количество лайков
   try {
     const postId = req.params._id;
     const { idUser, idComment } = req.body;
 
-    const user = await Users.findById(idUser).populate('likeComments');
-    console.log("fffffffffffffddd");
-    // console.log(user.likePosts.user, "user.likePosts.user");
-    console.log(idUser, "idUser");
-    // const post = await Posts.findById(postId).populate('comments').populate('likeComments');
-    // const post = await Posts.findById(postId).populate({path:'comments',populate:{path:'likeComments'})});
-
-    const comments = await Comments.find({ post: postId });
-
-    // Составляем массив ID всех комментариев
-    const commentIds = comments.map((comment) => comment._id);
-
-    // Ищем лайки для этих комментариев
-    const likes = await LikeComments.find({
-      comment: { $in: commentIds },
+    // Проверяем, существует ли уже такой лайк
+    const existingLike = await LikeComments.findOne({
+      user: idUser,
+      comment: idComment
     });
 
-    const currentComment = await Comments.findOne({ _id: idComment });
-    console.log(currentComment," ddddddddddssssssssssss");
-
-    if (likes.some(post => post.user == idUser)) {
-      console.log("ID найден!");
-    } else {
-      console.log("ID не найден.");
-      console.log("tttttttttttttttttttfffftt.");
-      const newComment = new LikeComments({
-        comment: postId,//gggggggggggggggg
-        user: idUser,
-      });
-      console.log("ttttttttttttttttttttt.");
-      const savedComment = await newComment.save();
-      
-      user.likeComments.push(savedComment._id);
-      await user.save();
-      // post.likeComments.push(savedComment._id);
-      
-      // post.likesCount++;
-      // await post.save();
-      res.status(201).json(likes.likesCount);
+    if (existingLike) {
+      return res.status(400).json({ message: "Вы уже лайкнули этот комментарий" });
     }
-  } catch (err) {
+
+    // Создаем новый лайк
+    const newLike = new LikeComments({
+      user: idUser,
+      comment: idComment
+    });
+
+    // Сохраняем лайк
+    await newLike.save();
+
+    // Обновляем счетчик лайков в комментарии
+    const updatedComment = await Comments.findByIdAndUpdate(
+      idComment,
+      { 
+        $inc: { likesCount: 1 },
+        $push: { likeComments: newLike._id }
+      },
+      { new: true }
+    );
+
+    // Добавляем ссылку на лайк в пользователя
+    await Users.findByIdAndUpdate(
+      idUser,
+      { $push: { likeComments: newLike._id } }
+    );
+
+    res.status(200).json({
+      message: "Лайк успешно добавлен",
+      comment: updatedComment
+    });
+
+  } catch(err) {
     console.error(err);
-    res.status(500).json({ message: "Ошибка при добавлении комментария" });
+    res.status(500).json({ message: "Ошибка при добавлении лайка" });
   }
 });
+
 
 app.post("/api/post/:_id/likePost", async (req, res) => {
   // сделать post запрос который получает id usera и posta, записывает в таблицу likePost нровую запись и перещитывает в  таблице Post количество лайков
