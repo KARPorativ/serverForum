@@ -234,7 +234,7 @@ app.get('/api/getPostsWithParams', async (req, res) => {
     console.log('kl', req.query);
 
     // Создаем базовый запрос
-    let query = Posts.find();
+    let query = Posts.find().populate('author');
 
     // Фильтрация по заголовку
     if (title) {
