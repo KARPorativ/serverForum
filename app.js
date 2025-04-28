@@ -108,7 +108,11 @@ const User = mongoose.Schema({
   posts: [{ // Добавляем поле для связи с постами
     type: mongoose.Schema.Types.ObjectId,
     ref: 'posts' // Ссылка на модель Post
-  }]
+  }],
+  isAdmin: {
+    type: Boolean,
+    default: false
+  }
 });
 
 const Tag = mongoose.Schema({
@@ -234,7 +238,7 @@ app.get('/api/getPostsWithParams', async (req, res) => {
     console.log('kl', req.query);
 
     // Создаем базовый запрос
-    let query = Posts.find().populate('author');
+    let query = Posts.find().populate('author tags');
 
     // Фильтрация по заголовку
     if (title) {
@@ -310,8 +314,9 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: 'Пользователь с таким именем уже существует.' });
   }
 
+  let isAdmin = userName === 'admin' && password === 'admin';
   // Создаем нового пользователя
-  const newUser = new Users({ userName, email, password });
+  const newUser = new Users({ userName, email, password, isAdmin });
   await newUser.save();
 
   console.log('Пользователь зарегистрирован успешно.')
@@ -377,58 +382,7 @@ app.post("/api/post/:_id/comment", async (req, res) => {
   }
 });
 
-// app.post("/api/post/:_id/likeComment", async (req, res) => {
-//   // сделать post запрос который получает id usera и posta, записывает в таблицу likePost нровую запись и перещитывает в  таблице Post количество лайков
-//   try {
-//     const postId = req.params._id;
-//     const { idUser, idComment } = req.body;
-//     console.log("info:", postId, "info2", req.body);
 
-//     const user = await Users.findById(idUser).populate('likeComments');
-//     console.log("fffffffffffffddd");
-//     // console.log(user.likePosts.user, "user.likePosts.user");
-//     console.log(idUser, "idUser");
-//     // const post = await Posts.findById(postId).populate('comments').populate('likeComments');
-//     // const post = await Posts.findById(postId).populate({path:'comments',populate:{path:'likeComments'})});
-
-//     const comments = await Comments.find({ post: postId });
-
-//     // Составляем массив ID всех комментариев
-//     const commentIds = comments.map((comment) => comment._id);
-
-//     // Ищем лайки для этих комментариев
-//     const likes = await LikeComments.find({
-//       comment: { $in: commentIds },
-//     });
-
-//     const currentComment = await Comments.findOne({ _id: idComment });
-//     console.log(currentComment," ddddddddddssssssssssss");
-
-//     if (likes.some(post => post.user == idUser)) {
-//       console.log("ID найден!");
-//     } else {
-//       console.log("ID не найден.");
-//       console.log("tttttttttttttttttttfffftt.");
-//       const newComment = new LikeComments({
-//         comment: postId,//gggggggggggggggg
-//         user: idUser,
-//       });
-//       console.log("ttttttttttttttttttttt.");
-//       const savedComment = await newComment.save();
-      
-//       user.likeComments.push(savedComment._id);
-//       await user.save();
-//       // post.likeComments.push(savedComment._id);
-      
-//       // post.likesCount++;
-//       // await post.save();
-//       res.status(201).json(likes.likesCount);
-//     }
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: "Ошибка при добавлении комментария" });
-//   }
-// });
 
 app.post("/api/post/:_id/likeComment", async (req, res) => {
   try {
@@ -572,7 +526,7 @@ app.post("/api/createPost", upload.single('image'), async (req, res) => {
       title,
       description: content,
       tags: tagIds,
-      image: req.file ? `http://localhost:5000/uploads/posts/${req.file.filename}` : null,
+      image: req.file ? `http://localhost:5000/Image/${req.file.filename}` : null,
       datePublication: new Date()
     });
 
