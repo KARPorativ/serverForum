@@ -6,6 +6,8 @@ import cors from 'cors';
 import multer from 'multer';
 import path from 'node:path';
 import { fileURLToPath } from 'url'
+import bcrypt from 'bcrypt'
+
 const app = express();
 const server = createServer(app);
 const storage = multer.diskStorage({
@@ -17,6 +19,8 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({ storage });
+
+const saltRounds = 10;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -216,15 +220,18 @@ app.post('/api/login', async (req, res) => {
           }
         ]
       });
-
+      const match = await bcrypt.compare(password, user.password);
+      if(!match){
+        res.status(401).json({ message: 'Неверный пароль' });
+      }
     if (!user) {
       return res.status(400).json({ message: 'Пользователь не найден.' });
     }
 
-    if (password !== user.password) {
-      return res.status(400).json({ message: 'Неверный пароль.' });
-    }
-
+    // if (password !== user.password) {
+    //   return res.status(400).json({ message: 'Неверный пароль.' });
+    // }
+    console.log('user', user);
     res.json(user);
   } catch (error) {
     console.error('Ошибка при авторизации:', error);
@@ -283,7 +290,6 @@ app.get('/api/getPostsWithParams', async (req, res) => {
   }
 });
 
-
 app.get('/api/getPost', async (req, res) => {
   // const post = req.query;
   const post = await Posts.find();
@@ -296,13 +302,10 @@ app.get('/api/getTags', async (req, res) => {
   res.json(tags);
 })
 
-
-
-
 // Эндпоинт для регистрации пользователя
 app.post('/api/register', async (req, res) => {
   const { userName, email, password } = req.body;
-
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
   // Проверяем переданные данные
   if (!userName || !password || !email) {
     return res.status(400).json({ error: 'Пожалуйста, предоставьте имя пользователя, email и пароль.' });
@@ -314,9 +317,9 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: 'Пользователь с таким именем уже существует.' });
   }
 
-  let isAdmin = userName === 'admin' && password === 'admin';
+  let isAdmin = userName === 'admin';
   // Создаем нового пользователя
-  const newUser = new Users({ userName, email, password, isAdmin });
+  const newUser = new Users({ userName, email, password: hashedPassword, isAdmin });
   await newUser.save();
 
   console.log('Пользователь зарегистрирован успешно.')
@@ -432,6 +435,50 @@ app.post("/api/post/:_id/likeComment", async (req, res) => {
   } catch(err) {
     console.error(err);
     res.status(500).json({ message: "Ошибка при добавлении лайка" });
+  }
+});
+
+
+app.get("/api/post/:_id/getSimularPosts", async (req, res) => {
+  try {
+    const postId = req.params._id;
+    console.log("postId", postId)
+    const currentPost = await Posts.findById(postId)
+    .select('tags')
+    .populate('tags')
+    .lean();
+    // console.log("выбранный пост", currentPost)
+  // 2. Получаем массив ID тегов текущего поста
+  const currentTagsIds = currentPost.tags.map(tag => tag._id);
+
+  // 3. Строим запрос для поиска связанных постов
+  let relatedPostsQuery = Posts.find({
+    _id: { $ne: postId } // Исключаем текущий пост
+  });
+console.log('привет');
+  // 4. Если у текущего поста есть теги, добавляем условие поиска по тегам
+  if (currentTagsIds.length > 0) {
+    relatedPostsQuery = relatedPostsQuery.or([
+      { tags: { $in: currentTagsIds } }, // Посты с любым из тегов
+      { tags: { $size: 0 } } // ИЛИ посты без тегов
+    ]);
+  }
+
+  // 5. Выполняем запрос с ограничением в 5 постов
+  const relatedPosts = await relatedPostsQuery
+    .limit(5)
+    .populate('author', 'userName avatar')
+    .populate('tags', 'tag')
+    .sort({ datePublication: -1 }) // Сортировка по дате (новые сначала)
+    .lean();
+console.log("выбранный пост", relatedPosts.length);
+
+  res.json(relatedPosts);
+
+
+  } catch(err) {
+    console.error(err);
+    res.status(500).json({ message: "Ошибка при получении данных" });
   }
 });
 
@@ -591,6 +638,20 @@ app.patch('/api/changeuser/:id', upload.single('avatar'), async (req, res) => {
     res.status(500).send('Server error');
   }
 });
+
+app.delete('/api/deletePost/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const deletedPost = await Posts.findByIdAndDelete(id);
+    if (!deletedPost) {
+      return res.status(404).send('Post not found');
+    }
+    res.status(200).json(deletedPost);
+  } catch (error) {
+    console.error('Error deleting post:', error);
+    res.status(500).send('Server error');
+  }
+})
 
 
 
