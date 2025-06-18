@@ -689,7 +689,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use('/Image', express.static(path.join(__dirname, 'Image')));
 
-app.use(cors());
+// app.use(cors());
+app.use(cors({
+  origin: 'https://lucent-ganache-4bd6b3.netlify.app',
+  credentials: true // если нужны куки/авторизация
+}));
 app.use(express.json());
 
 // mongoose.connect('mongodb://localhost:27017/cyberForum')
