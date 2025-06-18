@@ -1,7 +1,6 @@
 import express from 'express';
 import { createServer } from 'node:http';
 import mongoose from 'mongoose';
-import { type } from 'node:os';
 import cors from 'cors';
 import multer from 'multer';
 import path from 'node:path';
@@ -26,7 +25,9 @@ app.use(cors());
 app.use(express.json());
 
 // mongoose.connect('mongodb://localhost:27017/cyberForum')
-mongoose.connect('mongodb://127.0.0.1:27017/cyberForum')
+// mongoose.connect('mongodb://127.0.0.1:27017/cyberForum')
+// mongoose.connect('mongodb+srv://karpocazan:WmB4OUSU562AFMws@cluster0.uxidktb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0/cyberForum')
+mongoose.connect('mongodb+srv://karpocazan:WmB4OUSU562AFMws@cluster0.uxidktb.mongodb.net/cyberForum?retryWrites=true&w=majority')
   .then(() => console.log("Connected to yourDB-name database"))
   .catch((err) => console.log(err));
 
@@ -591,5 +592,5 @@ app.patch('/api/changeuser/:id', upload.single('avatar'), async (req, res) => {
 const PORT = 5000;
 
 server.listen(PORT, () => {
-  console.log(`server running at http://localhost:${PORT}`);
+  console.log(`сервер запушен на http://localhost:${PORT}`);
 });
